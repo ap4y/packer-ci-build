@@ -1,0 +1,75 @@
+{
+  "variables": {
+    "cpus": "8",
+    "memory": "12288",
+    "disk_size": "40960",
+    "headless": "true",
+    "mirror": "http://cloud-images.ubuntu.com",
+    "mirror_directory": "releases/bionic/release",
+    "iso_url": "{{user `mirror`}}/{{user `mirror_directory`}}/ubuntu-18.04-server-cloudimg-amd64.img",
+    "iso_checksum": "file:{{user `mirror`}}/{{user `mirror_directory`}}/SHA256SUMS",
+    "name": "ubuntu-18.04",
+    "template": "ubuntu-18.04-amd64",
+    "version": "TIMESTAMP"
+  },
+  "builders": [
+  {
+      "type": "qemu",
+      "format": "qcow2",
+      "net_device": "virtio-net",
+      "disk_interface": "virtio-scsi",
+      "disk_image": true,
+      "disk_size": "{{user `disk_size`}}",
+      "memory": "{{ user `memory` }}",
+      "cpus": "{{ user `cpus` }}",
+      "headless": "{{ user `headless` }}",
+      "iso_checksum": "{{user `iso_checksum`}}",
+      "iso_url": "{{user `iso_url`}}",
+      "output_directory": "packer-{{user `template`}}-qemu-base",
+      "shutdown_command": "echo 'vagrant' | sudo -S shutdown -P now",
+      "ssh_password": "vagrant",
+      "ssh_port": 22,
+      "ssh_username": "vagrant",
+      "ssh_wait_timeout": "10000s",
+      "vm_name": "{{ user `template` }}-base.qcow2",
+      "http_directory": "http",
+      "qemuargs": [
+          ["-smbios", "type=1,serial=ds=nocloud-net;seedfrom=http://{{ .HTTPIP }}:{{ .HTTPPort }}/"]
+      ]
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{ .Vars }} sudo -E -S bash '{{ .Path }}'",
+      "expect_disconnect": true,
+      "scripts": [
+          "provision/ubuntu/netperf.sh",
+          "provision/ubuntu/kernel-next-bpftool.sh",
+          "provision/ubuntu/kernel-next-clean.sh"
+      ]
+    },{
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{ .Vars }} sudo -E -S bash '{{ .Path }}'",
+      "expect_disconnect": true,
+      "scripts": [
+          "provision/ubuntu/kernel.sh"
+      ]
+    },{
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{ .Vars }} sudo -E -S bash '{{ .Path }}'",
+      "expect_disconnect": true,
+      "scripts": [
+          "provision/ubuntu/install-base.sh",
+          "provision/swap.sh"
+      ]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "checksum",
+      "checksum_types": ["sha256"],
+      "output": "packer-{{user `template`}}-qemu-base/{{ user `template` }}-base.checksum"
+    }
+  ]
+}

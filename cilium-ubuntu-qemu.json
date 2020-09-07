@@ -1,0 +1,73 @@
+{
+  "variables": {
+    "cpus": "8",
+    "memory": "12288",
+    "disk_size": "40960",
+    "headless": "true",
+    "name": "ubuntu-18.04",
+    "template": "ubuntu-18.04-amd64",
+    "iso_url": "packer-{{user `template`}}-qemu-base/{{ user `template` }}-base.qcow2",
+    "iso_checksum": "file:./packer-{{user `template`}}-qemu-base/{{ user `template` }}-base.checksum",
+    "version": "TIMESTAMP",
+    "cloud_token": "{{ env `VAGRANTCLOUD_TOKEN` }}",
+    "BUILD_ID": "{{ env `BUILD_ID` }}",
+    "NAME_PREFIX": "{{ env `NAME_PREFIX` }}",
+    "NAME_SUFFIX": "{{ env `NAME_SUFFIX` }}",
+    "CILIUM_BRANCH": "{{ env `CILIUM_BRANCH` }}"
+  },
+  "builders": [
+  {
+      "type": "qemu",
+      "format": "qcow2",
+      "net_device": "virtio-net",
+      "disk_interface": "virtio-scsi",
+      "disk_image": true,
+      "use_backing_file": true,
+      "disk_size": "{{user `disk_size`}}",
+      "memory": "{{ user `memory` }}",
+      "cpus": "{{ user `cpus` }}",
+      "headless": "{{ user `headless` }}",
+      "iso_checksum": "{{user `iso_checksum`}}",
+      "iso_url": "{{user `iso_url`}}",
+      "output_directory": "packer-{{user `template`}}-qemu",
+      "shutdown_command": "echo 'vagrant' | sudo -S shutdown -P now",
+      "ssh_password": "vagrant",
+      "ssh_port": 22,
+      "ssh_username": "vagrant",
+      "ssh_wait_timeout": "10000s",
+      "vm_name": "{{ user `template` }}-{{ user `NAME_PREFIX` }}{{ user `BUILD_ID` }}.qcow2"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "provision/env.bash",
+      "destination": "/tmp/env.bash"
+    },{
+      "type": "shell",
+      "environment_vars": [
+        "ENV_FILEPATH=/tmp/env.bash",
+        "CILIUM_BRANCH={{ user `CILIUM_BRANCH` }}",
+        "NAME_PREFIX={{ user `NAME_PREFIX` }}"
+      ],
+      "execute_command": "echo 'vagrant' | {{ .Vars }} sudo -E -S bash '{{ .Path }}'",
+      "expect_disconnect": true,
+      "scripts": [
+          "provision/ubuntu/install-packages.sh",
+          "provision/golang.sh",
+          "provision/registry.sh",
+          "provision/ubuntu/crio.sh",
+          "provision/ubuntu/containerd.sh",
+          "provision/pull-images.sh"
+      ]
+    }
+  ],
+  "post-processors": [
+    {
+      "output": "cilium-ginkgo-ubuntu-qemu-{{user `NAME_PREFIX`}}{{user `BUILD_ID`}}.box",
+      "type": "vagrant",
+      "compression_level": 9,
+      "keep_input_artifact": false
+    }
+  ]
+}
